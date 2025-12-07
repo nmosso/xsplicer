@@ -29,7 +29,7 @@ export default class Channels {
     private static lastAdSegment: string = '';
     private static adCycleCounter: number = 0;
     private static lastSegmentIndex: number = -1;
-    
+
     private static originUrlFromRequestPath = (reqPath: string) => {
         // remap /frx/...  -> CONFIG.originBase/...
         if (!reqPath.startsWith('/frx/')) return null;
@@ -406,10 +406,13 @@ export default class Channels {
                 }
             }
         }
+        const K = chunks.length; // número de segmentos originales
+        if (K === 0) return originalText;
 
         // Caso primer request: guardar último segmento y su índice
         if (!this.lastAdSegment) {
             const lastChunk = chunks[chunks.length - 1];
+            console.log('First request, setting lastAdSegment to:', lastChunk.uri);
             this.lastAdSegment = lastChunk.uri;
             this.lastSegmentIndex = chunks.length; // posición N para el cálculo de los ads
             // Retornamos playlist original con primer chunk + ads (elimino resto)
@@ -447,6 +450,8 @@ export default class Channels {
         result.push(...lines.slice(0, firstChunk.extinfIdx));
 
         // insertar ads
+        console.log(`Inserting ${adsToInsert.length} ads at position N=${N}`);
+
         if (adsToInsert.length > 0) {
             if (addDiscontinuity) result.push('#EXT-X-DISCONTINUITY');
             for (const seg of adsToInsert) {
@@ -456,12 +461,15 @@ export default class Channels {
             if (addDiscontinuity) result.push('#EXT-X-DISCONTINUITY');
         }
 
-        // agregar chunks originales
+        // agregar chunks originales, pero no más de K
+        let added = 0;
         for (const c of chunks) {
+            if (added >= K) break;
             result.push(lines[c.extinfIdx]);
             result.push(lines[c.uriIdx]);
+            added++;
         }
-
+        
         // Si N === 1 -> ciclo terminado
         if (N === 1) {
             this.lastAdSegment = '';
