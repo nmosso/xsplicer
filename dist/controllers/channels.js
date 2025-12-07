@@ -69,8 +69,12 @@ class Channels {
             if (addDiscontinuity)
                 result.push('#EXT-X-DISCONTINUITY');
             // agregar el primer chunk original
-            result.push(lines[firstChunk.extinfIdx]);
-            result.push(lines[firstChunk.uriIdx]);
+            //result.push(lines[firstChunk.extinfIdx]);
+            //result.push(lines[firstChunk.uriIdx]);
+            for (const c of chunks) {
+                result.push(lines[c.extinfIdx]);
+                result.push(lines[c.uriIdx]);
+            }
             if (addDiscontinuity)
                 result.push('#EXT-X-DISCONTINUITY');
             for (const seg of adSegments) {
@@ -88,7 +92,7 @@ class Channels {
             return originalText;
         }
         // Determinar cuántos ads poner según posición
-        const N = lastIdx + 1; // posición 1-based
+        const N = lastIdx + 1 + adSegments.length; // posición 1-based
         const adsToInsert = adSegments.slice(adSegments.length - N);
         // Construir nuevo playlist
         const result = [];
@@ -110,7 +114,7 @@ class Channels {
         // agregar chunks originales, pero no más de K
         let added = 0;
         for (const c of chunks) {
-            if (added >= K)
+            if (added >= K + adSegments.length)
                 break;
             result.push(lines[c.extinfIdx]);
             result.push(lines[c.uriIdx]);
