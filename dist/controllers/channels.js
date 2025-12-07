@@ -228,6 +228,10 @@ Channels.parseManifest = (req, res) => __awaiter(void 0, void 0, void 0, functio
                 position: 'start' // opcional si tu función lo soporta
             });
         }
+        else {
+            injectedText = originText;
+            console.log('Not within even minute interval, skipping ad injection');
+        }
         // 3. Replace /fre/ -> /frx/ and strip absolute URLs (leave only paths)
         injectedText = _a.patchHlsPaths(injectedText);
         console.log(`Injected ${limitedAds.length} ad segments, total duration ${total.toFixed(2)}s`);

@@ -237,6 +237,9 @@ export default class Channels {
                         position: 'start'  // opcional si tu función lo soporta
                     }
                 );
+            } else {
+                injectedText = originText;
+                console.log('Not within even minute interval, skipping ad injection');
             }
             // 3. Replace /fre/ -> /frx/ and strip absolute URLs (leave only paths)
             injectedText = this.patchHlsPaths(injectedText);
