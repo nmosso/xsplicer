@@ -71,38 +71,132 @@ Channels.parsePlaylist = (text) => {
  */
 Channels.injectAdsIntoRawPlaylist = (originalText, adSegments, options = {}) => {
     const lines = originalText.split(/\r?\n/);
-    // find last line index containing "#EXTINF"
-    let lastExtinfIndex = -1;
-    for (let i = lines.length - 1; i >= 0; i--) {
-        if (lines[i].startsWith('#EXTINF')) {
-            lastExtinfIndex = i;
-            break;
-        }
-    }
-    // If no EXTINF found, just append at end
-    let insertPos = lines.length;
-    if (lastExtinfIndex !== -1) {
-        // insert after the URI following last EXTINF (which is usually next line)
-        // find the URI line
-        if (lastExtinfIndex + 1 < lines.length) {
-            insertPos = lastExtinfIndex + 2; // after EXTINF and its URI
-        }
-        else {
-            insertPos = lines.length;
-        }
-    }
+    // localizar punto de inserción (ej. al inicio o after last extinf)
+    let insertPos = _a.findInsertPos(lines, options.position);
     const injected = [...lines];
-    if (options.addDiscontinuity) {
-        injected.splice(insertPos, 0, '#EXT-X-DISCONTINUITY');
-        insertPos++;
-    }
-    // Insert ad segments
+    // Insertar discontinuidad antes del bloque de ads
+    injected.splice(insertPos, 0, '#EXT-X-DISCONTINUITY');
+    insertPos++;
+    // Insertar ads
     for (const seg of adSegments) {
-        injected.splice(insertPos, 0, `#EXTINF:${seg.duration.toFixed(3)},${seg.title || ''}`, seg.uri);
+        // opcional: si tenés seg.stime -> insertar PROGRAM-DATE-TIME
+        if (seg.programDateTime) {
+            injected.splice(insertPos, 0, `#EXT-X-PROGRAM-DATE-TIME:${seg.programDateTime}`);
+            insertPos++;
+        }
+        injected.splice(insertPos, 0, `#EXTINF:${(seg.duration / 1000).toFixed(3)},`, seg.uri);
         insertPos += 2;
     }
+    // Insertar otra discontinuidad para separar retorno al origen
+    injected.splice(insertPos, 0, '#EXT-X-DISCONTINUITY');
+    insertPos++;
     return injected.join('\n');
 };
+/**
+ * Decide insertion position in a parsed m3u8 as array of lines.
+ *
+ * @param lines - array of manifest lines (originalText.split(/\r?\n/))
+ * @param position - 'start' | 'afterLastExtinf' | 'end' | 'beforeSequence'
+ * @returns numeric index in lines where to insert new lines
+ */
+Channels.findInsertPos = (lines, position = 'afterLastExtinf') => {
+    // Normalize
+    position = position || 'afterLastExtinf';
+    // Helper: find first index of a line that starts with token
+    const findFirstIndex = (token) => {
+        for (let i = 0; i < lines.length; i++) {
+            if (lines[i].startsWith(token))
+                return i;
+        }
+        return -1;
+    };
+    // Helper: find last index of a line that starts with token
+    const findLastIndex = (token) => {
+        for (let i = lines.length - 1; i >= 0; i--) {
+            if (lines[i].startsWith(token))
+                return i;
+        }
+        return -1;
+    };
+    // If playlist has endlist, insert before it for 'end' position
+    const endlistIdx = findFirstIndex('#EXT-X-ENDLIST');
+    if (position === 'end') {
+        return endlistIdx !== -1 ? endlistIdx : lines.length;
+    }
+    if (position === 'start') {
+        // Insert before first #EXTINF (i.e. after header tags)
+        const firstExtinf = findFirstIndex('#EXTINF');
+        if (firstExtinf !== -1) {
+            return firstExtinf; // insert just before the first EXTINF
+        }
+        // If no EXTINF found, insert after header (after #EXTM3U) or at top
+        const headerIdx = findFirstIndex('#EXTM3U');
+        return headerIdx !== -1 ? headerIdx + 1 : 0;
+    }
+    if (position === 'beforeSequence') {
+        // Try to insert after header but before media sequence block.
+        const mediaSeqIdx = findFirstIndex('#EXT-X-MEDIA-SEQUENCE');
+        const firstExtinf = findFirstIndex('#EXTINF');
+        if (mediaSeqIdx !== -1 && firstExtinf !== -1) {
+            // Insert at whichever comes first (usually after media-sequence tag but before first EXTINF)
+            return Math.min(mediaSeqIdx + 1, firstExtinf);
+        }
+        // fallback to 'start' heuristic
+        if (firstExtinf !== -1)
+            return firstExtinf;
+        const headerIdx = findFirstIndex('#EXTM3U');
+        return headerIdx !== -1 ? headerIdx + 1 : 0;
+    }
+    // position === 'afterLastExtinf' (default)
+    const lastExtinfIdx = findLastIndex('#EXTINF');
+    if (lastExtinfIdx !== -1) {
+        // Usually the URI of the segment is the next non-comment non-empty line after EXTINF
+        let uriLineIdx = lastExtinfIdx + 1;
+        while (uriLineIdx < lines.length && (lines[uriLineIdx].startsWith('#') || lines[uriLineIdx].trim() === '')) {
+            uriLineIdx++;
+        }
+        // Insert after the URI line (i.e., at uriLineIdx + 1)
+        return Math.min(uriLineIdx + 1, lines.length);
+    }
+    // If no EXTINF at all, fallback to 'end'
+    return endlistIdx !== -1 ? endlistIdx : lines.length;
+};
+// private static injectAdsIntoRawPlaylist = (originalText: string, adSegments: any, options: any = {}) => {
+//     const lines = originalText.split(/\r?\n/);
+//     // find last line index containing "#EXTINF"
+//     let lastExtinfIndex = -1;
+//     for (let i = lines.length - 1; i >= 0; i--) {
+//         if (lines[i].startsWith('#EXTINF')) {
+//             lastExtinfIndex = i;
+//             break;
+//         }
+//     }
+//     // If no EXTINF found, just append at end
+//     let insertPos = lines.length;
+//     if (lastExtinfIndex !== -1) {
+//         // insert after the URI following last EXTINF (which is usually next line)
+//         // find the URI line
+//         if (lastExtinfIndex + 1 < lines.length) {
+//             insertPos = lastExtinfIndex + 2; // after EXTINF and its URI
+//         } else {
+//             insertPos = lines.length;
+//         }
+//     }
+//     const injected = [...lines];
+//     if (options.addDiscontinuity) {
+//         injected.splice(insertPos, 0, '#EXT-X-DISCONTINUITY');
+//         insertPos++;
+//     }
+//     // Insert ad segments
+//     for (const seg of adSegments) {
+//         injected.splice(insertPos, 0,
+//             `#EXTINF:${seg.duration.toFixed(3)},${seg.title || ''}`,
+//             seg.uri
+//         );
+//         insertPos += 2;
+//     }
+//     return injected.join('\n');
+// }
 /**
 * Convert ad manifest (VOD) into an array of segments with absolute URIs.
 * Takes adManifestUrl (absolute) and raw text of ad manifest.
