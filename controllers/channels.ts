@@ -12,7 +12,7 @@ const CONFIG = {
     // Ad (VOD) manifest(s) — puede ser un solo manifiesto o varios rotativos
     adManifestUrl: 'http://loonorigin01.x1234.xyz/ads/cocacola/playlist.m3u8',
     // modo: 'append' (añade ads después del manifiesto actual) o 'replace_last_n' (reemplaza últimos N segmentos por ads)
-    insertMode: 'replace_last_n',
+    insertMode: 'replace_last_n_false',
     // si replace_last_n, cuantos segmentos del live reemplazar
     replaceLastN: 2,
     // si append, cuantos segundos máximos totales de ads inyectar (por seguridad)
@@ -194,6 +194,7 @@ private static parseManifest = async (req: Request, res: Response) => {
             }
         } else {
             // append mode: limit by ad duration
+            console.
             let total = 0;
             const limitedAds = [];
             for (const s of chosenAds) {
