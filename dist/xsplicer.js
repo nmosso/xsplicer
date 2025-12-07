@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const config_1 = require("./config/config"); //,debugMode
 const debug_1 = __importDefault(require("./base/debug"));
+const pgsql_1 = __importDefault(require("./pgsql/pgsql"));
 const routerdebug_1 = __importDefault(require("./server/routerdebug"));
 const routerclient_1 = __importDefault(require("./server/routerclient"));
 const server_1 = __importDefault(require("./server/server"));
@@ -26,7 +27,7 @@ else {
     else
         console.log('Running in PRODUCTION model');
 }
-//pgsql.instance;
+pgsql_1.default.instance;
 //mySql.instance;
 //redis.instance;
 new clock_1.default();
