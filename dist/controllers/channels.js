@@ -38,6 +38,8 @@ class Channels {
      */
     static injectAdsSlidingExact(originalText, adSegments, options = {}) {
         var _b;
+        console.log('-----------------------------------------------------------------------------------------------');
+        console.log('InjectAdsSlidingExact called with lastAdSegment:', this.lastAdSegment);
         const addDiscontinuity = (_b = options.addDiscontinuity) !== null && _b !== void 0 ? _b : true;
         const lines = originalText.split(/\r?\n/);
         // Recopilamos todos los chunks del playlist

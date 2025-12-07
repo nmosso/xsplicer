@@ -392,6 +392,8 @@ export default class Channels {
         adSegments: Array<{ uri: string, duration: number, title?: string }>,
         options: { addDiscontinuity?: boolean } = {}
     ): string {
+        console.log('-----------------------------------------------------------------------------------------------')
+        console.log('InjectAdsSlidingExact called with lastAdSegment:', this.lastAdSegment);
         const addDiscontinuity = options.addDiscontinuity ?? true;
         const lines = originalText.split(/\r?\n/);
 
