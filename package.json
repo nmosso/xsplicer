@@ -1,0 +1,52 @@
+{
+  "name": "xsplicer",
+  "version": "1.0.1",
+  "description": "x Splicer Content",
+  "main": "xsplicer.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/"
+  },
+  "author": "Nicolas M.",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/"
+  },
+  "homepage": "https://github.com/",
+  "dependencies": {
+    "axios": "^1.6.5",
+    "base64url": "^3.0.1",
+    "check-ip": "^1.1.1",
+    "cors": "^2.8.5",
+    "crypto": "^1.0.1",
+    "dotenv": "^16.4.1",
+    "express": "^4.22.1",
+    "express-handlebars": "^6.0.6",
+    "express-session": "^1.17.3",
+    "ipaddr.js": "^2.1.0",
+    "jsonwebtoken": "^8.5.1",
+    "md5": "^2.3.0",
+    "pg": "^8.7.3",
+    "pg-pool": "^3.5.1",
+    "redis": "^4.6.14",
+    "sharp": "^0.33.1",
+    "superagent": "^8.1.2",
+    "uuid": "^8.3.2"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.13",
+    "@types/express-session": "^1.17.4",
+    "@types/jsonwebtoken": "^8.5.8",
+    "@types/node": "^18.0.0",
+    "@types/pg": "^8.6.5",
+    "@types/pg-pool": "^2.0.3",
+    "@types/superagent": "^4.1.15",
+    "@types/uuid": "^8.3.4"
+  },
+  "keywords": [
+    "Identities"
+  ]
+}

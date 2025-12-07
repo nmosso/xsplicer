@@ -1,0 +1,21 @@
+{
+	"text to test": "Texto en Español",
+	"Email address": "Correo electrónico",
+	"Enter email": "Ingrese su email",
+	"Password": "Contraseña",
+	"Confirm Password":"Confirme la contraseña",
+	"Login": "Ingresar",
+	"Don't have an account?": "¿No tiene una cuenta?",
+	"Register": "Registrese",
+	"First Name":"Nombre",
+	"Last Name":"Apellido",
+	"Do you already have an acount?":"No tiene una cuenta?",
+	"Please Register":"Registrese",
+	"Invalid username or password": "Nombre de usuario o contraseña inválido",
+	"Hello":"Hola",
+	"The registration process is done, please chek your email and click the link sended.":"El registro ha sido efectuado, por favor revise su correo electronico.",
+	"The registration process has failed":"El proceso de registro ha fallado",
+	"Add Coins":"Comprar Coins",
+	"Now you can go to ":"Ahora puede acceder a traves del ",
+	"%": "%"
+}
