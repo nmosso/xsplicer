@@ -23,7 +23,7 @@ const CONFIG = {
     // modo: 'append' (añade ads después del manifiesto actual) o 'replace_last_n' (reemplaza últimos N segmentos por ads)
     insertMode: 'replace_last_n_false',
     // si replace_last_n, cuantos segmentos del live reemplazar
-    replaceLastN: 2,
+    replaceLastN: 3,
     // si append, cuantos segundos máximos totales de ads inyectar (por seguridad)
     maxAdDurationSeconds: 30,
     // Si true, inyecta una línea de discontinuidad para separar contenido
@@ -218,11 +218,16 @@ Channels.parseManifest = (req, res) => __awaiter(void 0, void 0, void 0, functio
             limitedAds.push(s);
             total += s.duration;
         }
-        // 2. Inject limited ads at the beginning of the playlist
-        let injectedText = _a.injectAdsIntoRawPlaylist(originText, limitedAds, {
-            addDiscontinuity: CONFIG.addDiscontinuity,
-            position: 'start' // opcional si tu función lo soporta
-        });
+        let startTime = Date.now();
+        console.log(`Start Time:`, startTime);
+        let injectedText = '';
+        if (_a.isWithinEvenMinuteInterval(startTime)) {
+            // 2. Inject limited ads at the beginning of the playlist
+            injectedText = _a.injectAdsIntoRawPlaylist(originText, limitedAds, {
+                addDiscontinuity: CONFIG.addDiscontinuity,
+                position: 'start' // opcional si tu función lo soporta
+            });
+        }
         // 3. Replace /fre/ -> /frx/ and strip absolute URLs (leave only paths)
         injectedText = _a.patchHlsPaths(injectedText);
         console.log(`Injected ${limitedAds.length} ad segments, total duration ${total.toFixed(2)}s`);
@@ -232,6 +237,21 @@ Channels.parseManifest = (req, res) => __awaiter(void 0, void 0, void 0, functio
         return res.send(injectedText);
     }
 });
+// Función para obtener el inicio del minuto par más cercano
+Channels.getEvenMinuteStartTime = (timestamp) => {
+    const date = new Date(timestamp);
+    const minutes = date.getMinutes();
+    const evenMinute = minutes % 2 === 0 ? minutes : minutes - 1;
+    date.setMinutes(evenMinute, 0, 0); // Establece segundos y milisegundos a 0
+    return date.getTime();
+};
+// Función para verificar si el tiempo está dentro del intervalo de ±5 segundos del minuto par
+Channels.isWithinEvenMinuteInterval = (timestamp) => {
+    const evenMinuteStart = _a.getEvenMinuteStartTime(timestamp);
+    const lowerBound = evenMinuteStart - 2500; // 2.5 segundos antes
+    const upperBound = evenMinuteStart + 2500; // 2.5 segundos después
+    return timestamp >= lowerBound && timestamp <= upperBound;
+};
 Channels.patchHlsPaths = (text) => {
     // 1️⃣ Reemplaza /fre/ por /frx/ solo en URLs que terminan en .hls
     return text.replace(/(https?:\/\/[^\/\s]+)?\/fre\/([^\s]+\.m3u8)/g, (_match, host, path) => {
