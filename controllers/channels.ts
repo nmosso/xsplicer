@@ -227,7 +227,7 @@ export default class Channels {
             let startTime = Date.now();
             console.log(`Start Time:`, startTime,' total:',total*1000);
             let injectedText = '';
-            if (this.isWithinEvenMinuteInterval(startTime, total)) {
+            if (this.isWithinEvenMinuteInterval(startTime, total * 1000)) {
                 // 2. Inject limited ads at the beginning of the playlist
                 injectedText = this.injectAdsIntoRawPlaylist(
                     originText,
@@ -244,7 +244,7 @@ export default class Channels {
             // 3. Replace /fre/ -> /frx/ and strip absolute URLs (leave only paths)
             injectedText = this.patchHlsPaths(injectedText);
             injectedText = this.stripAbsoluteUrlsToPaths(injectedText);
-            
+
             console.log(`Injected ${limitedAds.length} ad segments, total duration ${total.toFixed(2)}s`);
             console.log('Final injected playlist:', injectedText);
 
@@ -270,7 +270,10 @@ private static isWithinEvenMinuteInterval = (timestamp: any, endInterval:number=
     const lowerBound = evenMinuteStart - 2500; // 2.5 segundos antes
     const upperBound = evenMinuteStart + 2500 + endInterval; // 2.5 segundos después
 
-    console.log(`Even minute start: ${new Date(evenMinuteStart).toISOString()}, Lower bound: ${new Date(lowerBound).toISOString()}, Upper bound: ${new Date(upperBound).toISOString()}`);
+    console.log(`Actual Time: ${new Date(timestamp).toISOString()}`);
+    console.log(`Even minute start: ${new Date(evenMinuteStart).toISOString()}`);
+    console.log(`Lower bound: ${new Date(lowerBound).toISOString()}`);
+    console.log(`Upper bound: ${new Date(upperBound).toISOString()}`);
     return timestamp >= lowerBound && timestamp <= upperBound;
 }
 
