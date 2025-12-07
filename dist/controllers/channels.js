@@ -232,10 +232,11 @@ Channels.parseManifest = (req, res) => __awaiter(void 0, void 0, void 0, functio
 });
 Channels.patchHlsPaths = (text) => {
     // 1️⃣ Reemplaza /fre/ por /frx/ solo en URLs que terminan en .hls
-    let patched = text.replace(/(https?:\/\/[^ \r\n]*\/|^)\/fre\/([^ \r\n]+\.m3u8)/g, '$1/frx/$2');
-    // 2️⃣ Convierte URLs absolutas en solo paths
-    patched = _a.stripAbsoluteUrlsToPaths(patched);
-    return patched;
+    return text.replace(/(https?:\/\/[^\/\s]+)?\/fre\/([^\s]+\.m3u8)/g, (_match, host, path) => {
+        // Si hay host, lo mantenemos; sino queda solo path
+        const prefix = host !== null && host !== void 0 ? host : '';
+        return _a.stripAbsoluteUrlsToPaths(`${prefix}/frx/${path}`);
+    });
 };
 Channels.stripAbsoluteUrlsToPaths = (manifestText) => {
     // Reemplaza cualquier URL absoluta (http(s)://host/...) por su path (/...)

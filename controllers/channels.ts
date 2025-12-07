@@ -244,13 +244,12 @@ export default class Channels {
     }
     private static patchHlsPaths = (text: string) => {
         // 1️⃣ Reemplaza /fre/ por /frx/ solo en URLs que terminan en .hls
-        let patched = text.replace(/(https?:\/\/[^ \r\n]*\/|^)\/fre\/([^ \r\n]+\.m3u8)/g, '$1/frx/$2');
-
-        // 2️⃣ Convierte URLs absolutas en solo paths
-        patched = this.stripAbsoluteUrlsToPaths(patched);
-
-        return patched;
-    };
+        return text.replace(/(https?:\/\/[^\/\s]+)?\/fre\/([^\s]+\.m3u8)/g, (_match, host, path) => {
+            // Si hay host, lo mantenemos; sino queda solo path
+            const prefix = host ?? '';
+            return this.stripAbsoluteUrlsToPaths(`${prefix}/frx/${path}`);
+        });
+    }
     private static stripAbsoluteUrlsToPaths = (manifestText: string) => {
         // Reemplaza cualquier URL absoluta (http(s)://host/...) por su path (/...)
         // Ej: "http://server/frx/chan/seg.ts?id=1" -> "/frx/chan/seg.ts?id=1"
