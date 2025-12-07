@@ -68,15 +68,15 @@ class Channels {
             const result = lines.slice(0, firstChunk.extinfIdx); // cabecera
             if (addDiscontinuity)
                 result.push('#EXT-X-DISCONTINUITY');
+            // agregar el primer chunk original
+            result.push(lines[firstChunk.extinfIdx]);
+            result.push(lines[firstChunk.uriIdx]);
+            if (addDiscontinuity)
+                result.push('#EXT-X-DISCONTINUITY');
             for (const seg of adSegments) {
                 result.push(`#EXTINF:${seg.duration.toFixed(3)},${seg.title || ''}`);
                 result.push(seg.uri);
             }
-            if (addDiscontinuity)
-                result.push('#EXT-X-DISCONTINUITY');
-            // agregar el primer chunk original
-            result.push(lines[firstChunk.extinfIdx]);
-            result.push(lines[firstChunk.uriIdx]);
             return result.join('\n');
         }
         // Verificar si lastAdSegment sigue presente
