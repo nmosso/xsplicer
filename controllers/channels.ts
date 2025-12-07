@@ -248,7 +248,15 @@ export default class Channels {
                 );
             } else {
                 this.runAd = true;
-                injectedText = this.stripAbsoluteUrlsToPaths(originText);
+                //injectedText = this.stripAbsoluteUrlsToPaths(originText);
+                injectedText = this.injectAdsIntoRawPlaylist(
+                    originText,
+                    [],
+                    {
+                        addDiscontinuity: false,
+                        position: 'start'  // opcional si tu función lo soporta
+                    }
+                );
                 console.log('Not within even minute interval, skipping ad injection');
             }
             // 3. Replace /fre/ -> /frx/ and strip absolute URLs (leave only paths)

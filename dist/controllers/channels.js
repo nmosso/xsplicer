@@ -239,7 +239,11 @@ Channels.parseManifest = (req, res) => __awaiter(void 0, void 0, void 0, functio
         }
         else {
             _a.runAd = true;
-            injectedText = _a.stripAbsoluteUrlsToPaths(originText);
+            //injectedText = this.stripAbsoluteUrlsToPaths(originText);
+            injectedText = _a.injectAdsIntoRawPlaylist(originText, [], {
+                addDiscontinuity: false,
+                position: 'start' // opcional si tu función lo soporta
+            });
             console.log('Not within even minute interval, skipping ad injection');
         }
         // 3. Replace /fre/ -> /frx/ and strip absolute URLs (leave only paths)
