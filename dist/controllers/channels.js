@@ -30,12 +30,95 @@ const CONFIG = {
     addDiscontinuity: true,
 };
 class Channels {
+    /**
+     * Inject ads with "sliding + consumption" behaviour described by the user.
+     * - adSegments: array [{uri, duration, title?}] (uri should be path like /ads/...)
+     * - options.originPrefix defaults to '/fre/' to identify origin segments
+     * - options.addDiscontinuity true/false (recommended true)
+     */
+    static injectAdsSlidingExact(originalText, adSegments, options = {}) {
+        var _b;
+        const addDiscontinuity = (_b = options.addDiscontinuity) !== null && _b !== void 0 ? _b : true;
+        const lines = originalText.split(/\r?\n/);
+        // Recopilamos todos los chunks del playlist
+        const chunks = [];
+        for (let i = 0; i < lines.length; i++) {
+            if (lines[i].startsWith('#EXTINF')) {
+                let j = i + 1;
+                while (j < lines.length && (lines[j].startsWith('#') || lines[j].trim() === ''))
+                    j++;
+                if (j < lines.length) {
+                    chunks.push({ extinfIdx: i, uriIdx: j, uri: lines[j].trim() });
+                }
+            }
+        }
+        // Caso primer request: guardar último segmento y su índice
+        if (!this.lastAdSegment) {
+            const lastChunk = chunks[chunks.length - 1];
+            this.lastAdSegment = lastChunk.uri;
+            this.lastSegmentIndex = chunks.length; // posición N para el cálculo de los ads
+            // Retornamos playlist original con primer chunk + ads (elimino resto)
+            const firstChunk = chunks[0];
+            const result = lines.slice(0, firstChunk.extinfIdx); // cabecera
+            if (addDiscontinuity)
+                result.push('#EXT-X-DISCONTINUITY');
+            for (const seg of adSegments) {
+                result.push(`#EXTINF:${seg.duration.toFixed(3)},${seg.title || ''}`);
+                result.push(seg.uri);
+            }
+            if (addDiscontinuity)
+                result.push('#EXT-X-DISCONTINUITY');
+            // agregar el primer chunk original
+            result.push(lines[firstChunk.extinfIdx]);
+            result.push(lines[firstChunk.uriIdx]);
+            return result.join('\n');
+        }
+        // Verificar si lastAdSegment sigue presente
+        const lastIdx = chunks.findIndex(c => c.uri === this.lastAdSegment);
+        if (lastIdx === -1) {
+            // ciclo terminado, limpiamos estado y retornamos original
+            this.lastAdSegment = '';
+            this.lastSegmentIndex = -1;
+            return originalText;
+        }
+        // Determinar cuántos ads poner según posición
+        const N = lastIdx + 1; // posición 1-based
+        const adsToInsert = adSegments.slice(adSegments.length - N);
+        // Construir nuevo playlist
+        const result = [];
+        // cabecera
+        const firstChunk = chunks[0];
+        result.push(...lines.slice(0, firstChunk.extinfIdx));
+        // insertar ads
+        if (adsToInsert.length > 0) {
+            if (addDiscontinuity)
+                result.push('#EXT-X-DISCONTINUITY');
+            for (const seg of adsToInsert) {
+                result.push(`#EXTINF:${seg.duration.toFixed(3)},${seg.title || ''}`);
+                result.push(seg.uri);
+            }
+            if (addDiscontinuity)
+                result.push('#EXT-X-DISCONTINUITY');
+        }
+        // agregar chunks originales
+        for (const c of chunks) {
+            result.push(lines[c.extinfIdx]);
+            result.push(lines[c.uriIdx]);
+        }
+        // Si N === 1 -> ciclo terminado
+        if (N === 1) {
+            this.lastAdSegment = '';
+            this.lastSegmentIndex = -1;
+        }
+        return result.join('\n');
+    }
 }
 _a = Channels;
 Channels.runAd = false;
 // State (dentro de la misma clase)
 Channels.lastAdSegment = '';
 Channels.adCycleCounter = 0;
+Channels.lastSegmentIndex = -1;
 Channels.originUrlFromRequestPath = (reqPath) => {
     // remap /frx/...  -> CONFIG.originBase/...
     if (!reqPath.startsWith('/frx/'))
@@ -329,9 +412,9 @@ Channels.parseManifest = (req, res) => __awaiter(void 0, void 0, void 0, functio
         if (_a.isWithinEvenMinuteInterval(startTime, total * 1000)) {
             // 2. Inject limited ads at the beginning of the playlist
             _a.runAd = false;
-            injectedText = _a.injectAdsSliding(originText, limitedAds, {
+            injectedText = _a.injectAdsSlidingExact(originText, limitedAds, {
                 addDiscontinuity: CONFIG.addDiscontinuity,
-                position: 'start' // opcional si tu función lo soporta
+                //position: 'start'  // opcional si tu función lo soporta
             });
         }
         else {
@@ -353,149 +436,6 @@ Channels.parseManifest = (req, res) => __awaiter(void 0, void 0, void 0, functio
         return res.send(injectedText);
     }
 });
-/**
- * Inject ads with "sliding + consumption" behaviour described by the user.
- * - adSegments: array [{uri, duration, title?}] (uri should be path like /ads/...)
- * - options.originPrefix defaults to '/fre/' to identify origin segments
- * - options.addDiscontinuity true/false (recommended true)
- */
-Channels.injectAdsSliding = (originalText, adSegments, options = {}) => {
-    var _b, _c;
-    const originPrefix = (_b = options.originPrefix) !== null && _b !== void 0 ? _b : '/fre/';
-    const addDiscontinuity = (_c = options.addDiscontinuity) !== null && _c !== void 0 ? _c : true;
-    const lines = originalText.split(/\r?\n/);
-    // Collect origin segments (uri and line indexes)
-    const originUris = [];
-    for (let i = 0; i < lines.length; i++) {
-        if (lines[i].startsWith('#EXTINF')) {
-            // next non-comment non-empty line
-            let j = i + 1;
-            while (j < lines.length && (lines[j].startsWith('#') || lines[j].trim() === ''))
-                j++;
-            if (j < lines.length) {
-                const u = lines[j].trim();
-                if (u.includes(originPrefix)) {
-                    originUris.push({ uri: u, uriLineIdx: j, extinfLineIdx: i });
-                }
-            }
-        }
-    }
-    // If no origin segments, just return original (nothing to anchor)
-    if (originUris.length === 0)
-        return originalText;
-    // Determine current last origin segment
-    const currentLastOrigin = originUris[originUris.length - 1].uri;
-    // If we don't have a saved lastAdSegment yet -> set it to currentLastOrigin and reset counter
-    if (!_a.lastAdSegment) {
-        _a.lastAdSegment = currentLastOrigin;
-        _a.adCycleCounter = 0;
-        // We'll still fallthrough and attempt to inject on this request (as per requirements)
-    }
-    // If saved segment is not present in the current playlist -> clear state and return originalText
-    const foundIndex = originUris.findIndex(o => o.uri === _a.lastAdSegment);
-    if (foundIndex === -1) {
-        // clear state
-        _a.lastAdSegment = '';
-        _a.adCycleCounter = 0;
-        return originalText;
-    }
-    // saved segment present -> increment adCycleCounter and compute injection variant
-    _a.adCycleCounter = _a.adCycleCounter + 1;
-    // Prepare which ads to use this cycle
-    // Cycle mapping decided:
-    //  - cycle 1 => insert full ads AFTER FIRST origin segment
-    //  - cycle 2 => insert full ads AT TOP
-    //  - cycle >=3 => insert truncated ads at top, skipping (cycle-2) first ads
-    const cycle = _a.adCycleCounter;
-    const totalAds = adSegments.length;
-    // If cycle beyond consumption window -> clear state and return original
-    if (cycle > 2 + totalAds) {
-        _a.lastAdSegment = '';
-        _a.adCycleCounter = 0;
-        return originalText;
-    }
-    // Build adLines for this cycle:
-    let adsToInsert = [];
-    if (cycle === 1) {
-        // full ads inserted after first origin segment (index 0)
-        adsToInsert = [...adSegments];
-    }
-    else if (cycle === 2) {
-        // full ads at top
-        adsToInsert = [...adSegments];
-    }
-    else {
-        // cycle >=3: skip first (cycle-2) ads
-        const skip = cycle - 2;
-        adsToInsert = adSegments.slice(skip);
-    }
-    // Build ad lines (EXT-X-DISCONTINUITY, EXTINF, uri, ... , EXT-X-DISCONTINUITY)
-    const adLines = [];
-    if (addDiscontinuity)
-        adLines.push('#EXT-X-DISCONTINUITY');
-    for (const seg of adsToInsert) {
-        // Ensure duration is in seconds for EXTINF: assume seg.duration is seconds or ms (>10_000 -> ms heuristic)
-        let dur = seg.duration;
-        if (dur > 10000)
-            dur = dur / 1000;
-        adLines.push(`#EXTINF:${dur.toFixed(3)},${seg.title || ''}`);
-        adLines.push(seg.uri);
-    }
-    if (addDiscontinuity)
-        adLines.push('#EXT-X-DISCONTINUITY');
-    // Where to insert:
-    // - cycle 1 -> after FIRST origin segment (originUris[0].uriLineIdx + 1)
-    // - cycle >=2 -> at top (before first EXTINF) => position index 0 or after header lines (#EXTM3U etc)
-    let insertPos;
-    if (cycle === 1) {
-        // insert after the URI line of originUris[0]
-        const firstOrigin = originUris[0];
-        insertPos = firstOrigin.uriLineIdx + 1;
-    }
-    else {
-        // Insert at top: find first meaningful position (after optional header tags like #EXTM3U, version, targetduration, media-sequence)
-        let topIdx = 0;
-        // We want to insert after the media header but before the first #EXTINF typically.
-        // Find index of first #EXTINF
-        const firstExtinfIdx = lines.findIndex(l => l.startsWith('#EXTINF'));
-        if (firstExtinfIdx !== -1) {
-            topIdx = firstExtinfIdx; // insert just before first EXTINF
-        }
-        else {
-            // fallback to after EXTM3U header
-            const headerIdx = lines.findIndex(l => l.startsWith('#EXTM3U'));
-            topIdx = headerIdx !== -1 ? headerIdx + 1 : 0;
-        }
-        insertPos = topIdx;
-    }
-    // Avoid double-inserting if we detect ads already present at insertion position
-    const detectAlreadyInserted = (() => {
-        // check next up to adLines.length lines for an ad uri or discontinuity
-        for (let k = 0; k < Math.min(adLines.length, 12) && (insertPos + k) < lines.length; k++) {
-            const ln = lines[insertPos + k].trim();
-            if (ln === '#EXT-X-DISCONTINUITY')
-                return true;
-            if (ln.startsWith('#EXTINF')) {
-                // next line maybe uri
-                const m = insertPos + k + 1;
-                if (m < lines.length && lines[m].includes('/ads/'))
-                    return true;
-            }
-            if (ln.includes('/ads/'))
-                return true;
-        }
-        return false;
-    })();
-    if (detectAlreadyInserted) {
-        // don't re-inject; return originalText unchanged (but keep state)
-        return originalText;
-    }
-    // Compose final playlist: slice pre / insert adLines / append post
-    const pre = lines.slice(0, insertPos);
-    const post = lines.slice(insertPos);
-    const resultLines = [...pre, ...adLines, ...post];
-    return resultLines.join('\n');
-};
 // Función para obtener el inicio del minuto par más cercano
 Channels.getEvenMinuteStartTime = (timestamp) => {
     const date = new Date(timestamp);
