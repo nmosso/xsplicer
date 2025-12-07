@@ -153,9 +153,7 @@ Channels.parseManifest = (req, res) => __awaiter(void 0, void 0, void 0, functio
         // Reemplazar solo en URLs, no en todo el archivo
         console.log('Master playlist detected, proxying without ad insertion');
         // Primero reemplazamos /fre/ por /frx/ en paths relativos
-        let patched = originText.replace(/\/fre\//g, '/frx/');
-        // Luego convertimos cualquier URL absoluta en solo su path
-        patched = _a.stripAbsoluteUrlsToPaths(patched);
+        let patched = _a.patchHlsPaths(originText);
         res.set('Content-Type', 'application/vnd.apple.mpegurl');
         return res.send(patched);
     }
@@ -195,16 +193,14 @@ Channels.parseManifest = (req, res) => __awaiter(void 0, void 0, void 0, functio
             const baseText = before.join('\n');
             // Now inject ads into baseText (which ends just before the removed EXTINF)
             let injectedText = _a.injectAdsIntoRawPlaylist(baseText, chosenAds, { addDiscontinuity: CONFIG.addDiscontinuity });
-            injectedText = injectedText.replace(/\/fre\//g, '/frx/');
-            injectedText = _a.stripAbsoluteUrlsToPaths(injectedText);
+            injectedText = _a.patchHlsPaths(injectedText);
             res.set('Content-Type', 'application/vnd.apple.mpegurl');
             return res.send(injectedText);
         }
         else {
             // fallback to append
             let injectedText = _a.injectAdsIntoRawPlaylist(originText, chosenAds, { addDiscontinuity: CONFIG.addDiscontinuity });
-            injectedText = injectedText.replace(/\/fre\//g, '/frx/');
-            injectedText = _a.stripAbsoluteUrlsToPaths(injectedText);
+            injectedText = _a.patchHlsPaths(injectedText);
             res.set('Content-Type', 'application/vnd.apple.mpegurl');
             return res.send(injectedText);
         }
@@ -227,13 +223,19 @@ Channels.parseManifest = (req, res) => __awaiter(void 0, void 0, void 0, functio
             position: 'start' // opcional si tu función lo soporta
         });
         // 3. Replace /fre/ -> /frx/ and strip absolute URLs (leave only paths)
-        injectedText = injectedText.replace(/\/fre\//g, '/frx/');
-        injectedText = _a.stripAbsoluteUrlsToPaths(injectedText);
+        injectedText = _a.patchHlsPaths(injectedText);
         // 3. Return modified playlist
         res.set('Content-Type', 'application/vnd.apple.mpegurl');
         return res.send(injectedText);
     }
 });
+Channels.patchHlsPaths = (text) => {
+    // 1️⃣ Reemplaza /fre/ por /frx/ solo en URLs que terminan en .hls
+    let patched = text.replace(/(https?:\/\/[^ \r\n]*\/|^)\/fre\/([^ \r\n]+\.hls)/g, '$1/frx/$2');
+    // 2️⃣ Convierte URLs absolutas en solo paths
+    patched = _a.stripAbsoluteUrlsToPaths(patched);
+    return patched;
+};
 Channels.stripAbsoluteUrlsToPaths = (manifestText) => {
     // Reemplaza cualquier URL absoluta (http(s)://host/...) por su path (/...)
     // Ej: "http://server/frx/chan/seg.ts?id=1" -> "/frx/chan/seg.ts?id=1"
