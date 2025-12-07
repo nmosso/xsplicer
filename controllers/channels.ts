@@ -225,9 +225,9 @@ export default class Channels {
                 total += s.duration;
             }
             let startTime = Date.now();
-            console.log(`Start Time:`, startTime);
+            console.log(`Start Time:`, startTime,' total:',total);
             let injectedText = '';
-            if (this.isWithinEvenMinuteInterval(startTime)) {
+            if (this.isWithinEvenMinuteInterval(startTime, total)) {
                 // 2. Inject limited ads at the beginning of the playlist
                 injectedText = this.injectAdsIntoRawPlaylist(
                     originText,
@@ -264,10 +264,10 @@ private static getEvenMinuteStartTime = (timestamp:any): number => {
 }
 
 // Función para verificar si el tiempo está dentro del intervalo de ±5 segundos del minuto par
-private static isWithinEvenMinuteInterval = (timestamp: any) => {
+private static isWithinEvenMinuteInterval = (timestamp: any, endInterval:number=300000) => {
     const evenMinuteStart = this.getEvenMinuteStartTime(timestamp);
     const lowerBound = evenMinuteStart - 2500; // 2.5 segundos antes
-    const upperBound = evenMinuteStart + 2500; // 2.5 segundos después
+    const upperBound = evenMinuteStart + 2500 + endInterval; // 2.5 segundos después
     return timestamp >= lowerBound && timestamp <= upperBound;
 }
 
