@@ -209,7 +209,7 @@ private static parseManifest = async (req: Request, res: Response) => {
 }
     public static ssai = async (req: Request, res: Response) => {
         //Insertamos la publicidad cada X minutos
-
+        console.log(`SSAI Request for path: ${req.path}`);
         try {
             this.parseManifest(req, res);
 

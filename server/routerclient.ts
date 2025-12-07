@@ -10,7 +10,7 @@ export default  router;
 
 
 /*Request for manifests HLS */
-router.get('/fre/*',[validOrigin('console')], Channels.ssai);
+router.get('/frx/*',[validOrigin('console')], Channels.ssai);
 
 
 

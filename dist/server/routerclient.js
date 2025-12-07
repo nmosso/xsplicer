@@ -9,4 +9,4 @@ const channels_1 = __importDefault(require("../controllers/channels"));
 const router = (0, express_1.Router)();
 exports.default = router;
 /*Request for manifests HLS */
-router.get('/fre/*', [(0, base_1.validOrigin)('console')], channels_1.default.ssai);
+router.get('/frx/*', [(0, base_1.validOrigin)('console')], channels_1.default.ssai);

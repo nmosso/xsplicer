@@ -22,7 +22,7 @@ if (debugMode == undefined) {
     if (debugMode) console.log('Running in DEVEL model'); else console.log('Running in PRODUCTION model');
 }
 
-pgsql.instance;
+//pgsql.instance;
 //mySql.instance;
 //redis.instance;
 new Clock();

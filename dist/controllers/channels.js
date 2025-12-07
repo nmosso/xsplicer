@@ -206,6 +206,7 @@ Channels.parseManifest = (req, res) => __awaiter(void 0, void 0, void 0, functio
 });
 Channels.ssai = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     //Insertamos la publicidad cada X minutos
+    console.log(`SSAI Request for path: ${req.path}`);
     try {
         _a.parseManifest(req, res);
     }
