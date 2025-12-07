@@ -263,8 +263,8 @@ Channels.getEvenMinuteStartTime = (timestamp) => {
 // Función para verificar si el tiempo está dentro del intervalo de ±5 segundos del minuto par
 Channels.isWithinEvenMinuteInterval = (timestamp, endInterval = 300000) => {
     const evenMinuteStart = _a.getEvenMinuteStartTime(timestamp);
-    const lowerBound = evenMinuteStart - 2500; // 2.5 segundos antes
-    const upperBound = evenMinuteStart + 2500 + endInterval; // 2.5 segundos después
+    const lowerBound = evenMinuteStart; // 2.5 segundos antes
+    const upperBound = evenMinuteStart + endInterval; // 2.5 segundos después
     console.log(`Actual Time: ${new Date(timestamp).toISOString()}`);
     console.log(`Even minute: ${new Date(evenMinuteStart).toISOString()}`);
     console.log(`Lower bound: ${new Date(lowerBound).toISOString()}`);
