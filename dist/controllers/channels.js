@@ -256,7 +256,7 @@ Channels.isWithinEvenMinuteInterval = (timestamp, endInterval = 300000) => {
     const lowerBound = evenMinuteStart - 2500; // 2.5 segundos antes
     const upperBound = evenMinuteStart + 2500 + endInterval; // 2.5 segundos después
     console.log(`Actual Time: ${new Date(timestamp).toISOString()}`);
-    console.log(`Even minute start: ${new Date(evenMinuteStart).toISOString()}`);
+    console.log(`Even minute: ${new Date(evenMinuteStart).toISOString()}`);
     console.log(`Lower bound: ${new Date(lowerBound).toISOString()}`);
     console.log(`Upper bound: ${new Date(upperBound).toISOString()}`);
     return timestamp >= lowerBound && timestamp <= upperBound;
