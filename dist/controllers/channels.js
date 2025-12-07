@@ -30,15 +30,6 @@ const CONFIG = {
     addDiscontinuity: true,
 };
 class Channels {
-    static patchHlsPaths(text) {
-        // 1️⃣ Reemplaza /fre/ → /frx/ solo en URLs que terminen en .m3u8
-        const replaced = text.replace(/(https?:\/\/[^\/\s]+)?\/fre\/([^\s]+\.m3u8)/g, (_match, host, path) => {
-            const prefix = host !== null && host !== void 0 ? host : '';
-            return `${prefix}/frx/${path}`;
-        });
-        // 2️⃣ Siempre convertir URLs absolutas a paths
-        return this.stripAbsoluteUrlsToPaths(replaced);
-    }
 }
 _a = Channels;
 Channels.originUrlFromRequestPath = (reqPath) => {
@@ -238,10 +229,12 @@ Channels.parseManifest = (req, res) => __awaiter(void 0, void 0, void 0, functio
             });
         }
         else {
+            injectedText = _a.stripAbsoluteUrlsToPaths(originText);
             console.log('Not within even minute interval, skipping ad injection');
         }
         // 3. Replace /fre/ -> /frx/ and strip absolute URLs (leave only paths)
         injectedText = _a.patchHlsPaths(injectedText);
+        injectedText = _a.stripAbsoluteUrlsToPaths(injectedText);
         console.log(`Injected ${limitedAds.length} ad segments, total duration ${total.toFixed(2)}s`);
         console.log('Final injected playlist:', injectedText);
         // 3. Return modified playlist
@@ -262,7 +255,16 @@ Channels.isWithinEvenMinuteInterval = (timestamp, endInterval = 300000) => {
     const evenMinuteStart = _a.getEvenMinuteStartTime(timestamp);
     const lowerBound = evenMinuteStart - 2500; // 2.5 segundos antes
     const upperBound = evenMinuteStart + 2500 + endInterval; // 2.5 segundos después
+    console.log(`Even minute start: ${new Date(evenMinuteStart).toISOString()}, Lower bound: ${new Date(lowerBound).toISOString()}, Upper bound: ${new Date(upperBound).toISOString()}`);
     return timestamp >= lowerBound && timestamp <= upperBound;
+};
+Channels.patchHlsPaths = (text) => {
+    // 1️⃣ Reemplaza /fre/ por /frx/ solo en URLs que terminan en .hls
+    return text.replace(/(https?:\/\/[^\/\s]+)?\/fre\/([^\s]+\.m3u8)/g, (_match, host, path) => {
+        // Si hay host, lo mantenemos; sino queda solo path
+        const prefix = host !== null && host !== void 0 ? host : '';
+        return _a.stripAbsoluteUrlsToPaths(`${prefix}/frx/${path}`);
+    });
 };
 Channels.stripAbsoluteUrlsToPaths = (manifestText) => {
     // Reemplaza cualquier URL absoluta (http(s)://host/...) por su path (/...)
