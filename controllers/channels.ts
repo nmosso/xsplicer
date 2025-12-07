@@ -109,7 +109,37 @@ export default class Channels {
 
         return injected.join('\n');
     }
+    private static injectAdsBeforeRawPlaylist = (originalText: string, adSegments: any, options: any = {}) => {
+        const lines = originalText.split(/\r?\n/);
+        let insertPos = lines.length;
+        const newLine = "#EXT-X-DISCONTINUITY";
+        for (let i = 0; i < lines.length; i++) {
+            if (lines[i].startsWith('#EXTINF')) {
+                insertPos= i; //lines.splice(i, 0, newLine);
+                break;
+            }
+        }
+        const injected = lines.slice(0, insertPos + 1);   // incluye el índice i
+        const pos = lines.slice(insertPos + 1);      // desde i+1 hasta el final
+        
 
+        // Insert ad segments
+        for (const seg of adSegments) {
+            injected.splice(insertPos, 0,
+                `#EXTINF:${seg.duration.toFixed(3)},${seg.title || ''}`,
+                seg.uri
+            );
+            insertPos += 2;
+        }
+        //const injected = [...pre];
+        if (options.addDiscontinuity) {
+            injected.splice(insertPos, 0, '#EXT-X-DISCONTINUITY');
+            insertPos++;
+        }
+
+        injected.push(...pos);
+        return injected.join('\n');
+    }
     /**
  * Convert ad manifest (VOD) into an array of segments with absolute URIs.
  * Takes adManifestUrl (absolute) and raw text of ad manifest.
@@ -207,7 +237,7 @@ export default class Channels {
                 // create new base playlist text without the last N segments
                 const baseText = before.join('\n');
                 // Now inject ads into baseText (which ends just before the removed EXTINF)
-                let injectedText = this.injectAdsIntoRawPlaylist(baseText, chosenAds, { addDiscontinuity: CONFIG.addDiscontinuity });
+                let injectedText = this.injectAdsBeforeRawPlaylist(baseText, chosenAds, { addDiscontinuity: CONFIG.addDiscontinuity });
                 injectedText = this.patchHlsPaths(injectedText);
                 res.set('Content-Type', 'application/vnd.apple.mpegurl');
                 return res.send(injectedText);
@@ -238,7 +268,7 @@ export default class Channels {
             if (this.isWithinEvenMinuteInterval(startTime, total * 1000)) {
                 // 2. Inject limited ads at the beginning of the playlist
                 this.runAd = false;
-                injectedText = this.injectAdsIntoRawPlaylist(
+                injectedText = this.injectAdsBeforeRawPlaylist(
                     originText,
                     limitedAds,
                     {

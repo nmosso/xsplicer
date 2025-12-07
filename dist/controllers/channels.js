@@ -110,6 +110,31 @@ Channels.injectAdsIntoRawPlaylist = (originalText, adSegments, options = {}) => 
     }
     return injected.join('\n');
 };
+Channels.injectAdsBeforeRawPlaylist = (originalText, adSegments, options = {}) => {
+    const lines = originalText.split(/\r?\n/);
+    let insertPos = lines.length;
+    const newLine = "#EXT-X-DISCONTINUITY";
+    for (let i = 0; i < lines.length; i++) {
+        if (lines[i].startsWith('#EXTINF')) {
+            insertPos = i; //lines.splice(i, 0, newLine);
+            break;
+        }
+    }
+    const injected = lines.slice(0, insertPos + 1); // incluye el índice i
+    const pos = lines.slice(insertPos + 1); // desde i+1 hasta el final
+    // Insert ad segments
+    for (const seg of adSegments) {
+        injected.splice(insertPos, 0, `#EXTINF:${seg.duration.toFixed(3)},${seg.title || ''}`, seg.uri);
+        insertPos += 2;
+    }
+    //const injected = [...pre];
+    if (options.addDiscontinuity) {
+        injected.splice(insertPos, 0, '#EXT-X-DISCONTINUITY');
+        insertPos++;
+    }
+    injected.push(...pos);
+    return injected.join('\n');
+};
 /**
 * Convert ad manifest (VOD) into an array of segments with absolute URIs.
 * Takes adManifestUrl (absolute) and raw text of ad manifest.
@@ -201,7 +226,7 @@ Channels.parseManifest = (req, res) => __awaiter(void 0, void 0, void 0, functio
             // create new base playlist text without the last N segments
             const baseText = before.join('\n');
             // Now inject ads into baseText (which ends just before the removed EXTINF)
-            let injectedText = _a.injectAdsIntoRawPlaylist(baseText, chosenAds, { addDiscontinuity: CONFIG.addDiscontinuity });
+            let injectedText = _a.injectAdsBeforeRawPlaylist(baseText, chosenAds, { addDiscontinuity: CONFIG.addDiscontinuity });
             injectedText = _a.patchHlsPaths(injectedText);
             res.set('Content-Type', 'application/vnd.apple.mpegurl');
             return res.send(injectedText);
@@ -232,7 +257,7 @@ Channels.parseManifest = (req, res) => __awaiter(void 0, void 0, void 0, functio
         if (_a.isWithinEvenMinuteInterval(startTime, total * 1000)) {
             // 2. Inject limited ads at the beginning of the playlist
             _a.runAd = false;
-            injectedText = _a.injectAdsIntoRawPlaylist(originText, limitedAds, {
+            injectedText = _a.injectAdsBeforeRawPlaylist(originText, limitedAds, {
                 addDiscontinuity: CONFIG.addDiscontinuity,
                 position: 'start' // opcional si tu función lo soporta
             });
