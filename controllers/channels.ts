@@ -194,7 +194,7 @@ private static parseManifest = async (req: Request, res: Response) => {
             }
         } else {
             // append mode: limit by ad duration
-            console.
+            console.log('Appending ads to playlist');
             let total = 0;
             const limitedAds = [];
             for (const s of chosenAds) {

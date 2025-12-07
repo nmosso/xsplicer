@@ -191,6 +191,7 @@ Channels.parseManifest = (req, res) => __awaiter(void 0, void 0, void 0, functio
     }
     else {
         // append mode: limit by ad duration
+        console.log('Appending ads to playlist');
         let total = 0;
         const limitedAds = [];
         for (const s of chosenAds) {
