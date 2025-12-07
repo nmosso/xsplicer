@@ -33,6 +33,8 @@ class Channels {
 }
 _a = Channels;
 Channels.runAd = false;
+// dentro de tu clase
+Channels.lastAdSegment = '';
 Channels.originUrlFromRequestPath = (reqPath) => {
     // remap /frx/...  -> CONFIG.originBase/...
     if (!reqPath.startsWith('/frx/'))
@@ -110,30 +112,99 @@ Channels.injectAdsIntoRawPlaylist = (originalText, adSegments, options = {}) => 
     }
     return injected.join('\n');
 };
+/**
+ * Insert ads after the saved last origin segment. If lastAdSegment is empty,
+ * grab the last origin segment from this playlist and set it, then inject.
+ *
+ * Behaviour:
+ * - If lastAdSegment === '' -> set it to current last origin segment and inject ads after it.
+ * - Else if lastAdSegment found in current playlist -> inject ads after that segment.
+ * - Else -> lastAdSegment disappeared -> clear it and return original playlist unchanged.
+ */
 Channels.injectAdsBeforeRawPlaylist = (originalText, adSegments, options = {}) => {
+    const originPrefix = options.originPrefix || '/fre/';
     const lines = originalText.split(/\r?\n/);
-    let insertPos = lines.length;
-    const newLine = "#EXT-X-DISCONTINUITY";
+    // Helper: find all URIs that belong to originPrefix and their line indexes
+    const originUris = [];
     for (let i = 0; i < lines.length; i++) {
         if (lines[i].startsWith('#EXTINF')) {
-            insertPos = i; //lines.splice(i, 0, newLine);
-            break;
+            // next non-comment non-empty line is the URI
+            let j = i + 1;
+            while (j < lines.length && (lines[j].startsWith('#') || lines[j].trim() === ''))
+                j++;
+            if (j < lines.length) {
+                const uri = lines[j].trim();
+                if (uri.includes(originPrefix)) {
+                    originUris.push({ uri, uriLineIdx: j, extinfLineIdx: i });
+                }
+            }
         }
     }
-    const injected = lines.slice(0, insertPos + 1); // incluye el índice i
-    const pos = lines.slice(insertPos + 1); // desde i+1 hasta el final
-    // Insert ad segments
+    // If no origin segments found -> nothing to do
+    if (originUris.length === 0) {
+        return originalText;
+    }
+    // Determine current last origin segment in this playlist
+    const currentLastOrigin = originUris[originUris.length - 1].uri;
+    // If we don't have a saved lastAdSegment yet -> set it to currentLastOrigin
+    if (!_a.lastAdSegment) {
+        _a.lastAdSegment = currentLastOrigin;
+    }
+    // Check if saved lastAdSegment appears in current playlist
+    const foundIndex = originUris.findIndex(o => o.uri === _a.lastAdSegment);
+    if (foundIndex === -1) {
+        // saved segment no longer exists -> clear saved and return original (no injection)
+        _a.lastAdSegment = '';
+        return originalText;
+    }
+    // Determine insertion position: after the URI line of the saved segment
+    const target = originUris[foundIndex];
+    let insertPos = target.uriLineIdx + 1; // insert after the URI line
+    // Safety: if ads are already present immediately after insertPos (avoid double-inject)
+    // check a few lines ahead for an ad uri pattern (e.g., '/ads/' or presence of EXT-X-DISCONTINUITY then ads)
+    const alreadyHasAds = (() => {
+        const lookAhead = 6; // check next up to 6 lines for the first ad uri
+        for (let k = 0; k < lookAhead && (insertPos + k) < lines.length; k++) {
+            const l = lines[insertPos + k].trim();
+            if (l === '#EXT-X-DISCONTINUITY')
+                return true;
+            if (l.startsWith('#EXTINF')) {
+                // next non-comment line might be uri
+                let m = insertPos + k + 1;
+                while (m < lines.length && (lines[m].startsWith('#') || lines[m].trim() === ''))
+                    m++;
+                if (m < lines.length && lines[m].includes('/ads/'))
+                    return true;
+            }
+            if (l.includes('/ads/'))
+                return true;
+        }
+        return false;
+    })();
+    if (alreadyHasAds) {
+        // Ads already inserted here -> return modified playlist but also ensure lastAdSegment persists
+        return originalText;
+    }
+    // Build new lines: pre = up to insertPos-1, post = from insertPos...
+    const pre = lines.slice(0, insertPos);
+    const post = lines.slice(insertPos);
+    // Prepare ad block lines
+    const adLines = [];
+    if (options.addDiscontinuity)
+        adLines.push('#EXT-X-DISCONTINUITY');
     for (const seg of adSegments) {
-        injected.splice(insertPos, 0, `#EXTINF:${seg.duration.toFixed(3)},${seg.title || ''}`, seg.uri);
-        insertPos += 2;
+        // Ensure duration is in seconds (EXTINF expects seconds). If seg.duration looks very large assume ms.
+        let durSeconds = seg.duration;
+        if (durSeconds > 10000)
+            durSeconds = durSeconds / 1000; // heuristic: if >10s as int maybe ms
+        adLines.push(`#EXTINF:${durSeconds.toFixed(3)},${seg.title || ''}`);
+        adLines.push(seg.uri);
     }
-    //const injected = [...pre];
-    if (options.addDiscontinuity) {
-        injected.splice(insertPos, 0, '#EXT-X-DISCONTINUITY');
-        insertPos++;
-    }
-    injected.push(...pos);
-    return injected.join('\n');
+    if (options.addDiscontinuity)
+        adLines.push('#EXT-X-DISCONTINUITY');
+    // New playlist: pre + adLines + post
+    const resultLines = [...pre, ...adLines, ...post];
+    return resultLines.join('\n');
 };
 /**
 * Convert ad manifest (VOD) into an array of segments with absolute URIs.

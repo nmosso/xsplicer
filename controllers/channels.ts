@@ -25,7 +25,10 @@ const CONFIG = {
 
 export default class Channels {
     private static runAd = false;
-    
+    // dentro de tu clase
+    private static lastAdSegment: string = '';
+
+
     private static originUrlFromRequestPath = (reqPath: string) => {
         // remap /frx/...  -> CONFIG.originBase/...
         if (!reqPath.startsWith('/frx/')) return null;
@@ -66,7 +69,7 @@ export default class Channels {
         const lines = originalText.split(/\r?\n/);
         const newLine = "#EXT-X-DISCONTINUITY";
         for (let i = 0; i < lines.length; i++) {
-            if (lines[i].startsWith('#EXTINF')) {   
+            if (lines[i].startsWith('#EXTINF')) {
                 lines.splice(i, 0, newLine);
                 break;
             }
@@ -109,37 +112,109 @@ export default class Channels {
 
         return injected.join('\n');
     }
-    private static injectAdsBeforeRawPlaylist = (originalText: string, adSegments: any, options: any = {}) => {
+
+    /**
+     * Insert ads after the saved last origin segment. If lastAdSegment is empty,
+     * grab the last origin segment from this playlist and set it, then inject.
+     *
+     * Behaviour:
+     * - If lastAdSegment === '' -> set it to current last origin segment and inject ads after it.
+     * - Else if lastAdSegment found in current playlist -> inject ads after that segment.
+     * - Else -> lastAdSegment disappeared -> clear it and return original playlist unchanged.
+     */
+    private static injectAdsBeforeRawPlaylist = (originalText: string, adSegments: Array<{ uri: string, duration: number, title?: string }>, options: { originPrefix?: string, addDiscontinuity?: boolean } = {}) => {
+        const originPrefix = options.originPrefix || '/fre/';
         const lines = originalText.split(/\r?\n/);
-        let insertPos = lines.length;
-        const newLine = "#EXT-X-DISCONTINUITY";
+
+        // Helper: find all URIs that belong to originPrefix and their line indexes
+        const originUris: { uri: string, uriLineIdx: number, extinfLineIdx: number }[] = [];
         for (let i = 0; i < lines.length; i++) {
             if (lines[i].startsWith('#EXTINF')) {
-                insertPos= i; //lines.splice(i, 0, newLine);
-                break;
+                // next non-comment non-empty line is the URI
+                let j = i + 1;
+                while (j < lines.length && (lines[j].startsWith('#') || lines[j].trim() === '')) j++;
+                if (j < lines.length) {
+                    const uri = lines[j].trim();
+                    if (uri.includes(originPrefix)) {
+                        originUris.push({ uri, uriLineIdx: j, extinfLineIdx: i });
+                    }
+                }
             }
         }
-        const injected = lines.slice(0, insertPos + 1);   // incluye el índice i
-        const pos = lines.slice(insertPos + 1);      // desde i+1 hasta el final
-        
 
-        // Insert ad segments
+        // If no origin segments found -> nothing to do
+        if (originUris.length === 0) {
+            return originalText;
+        }
+
+        // Determine current last origin segment in this playlist
+        const currentLastOrigin = originUris[originUris.length - 1].uri;
+
+        // If we don't have a saved lastAdSegment yet -> set it to currentLastOrigin
+        if (!this.lastAdSegment) {
+            this.lastAdSegment = currentLastOrigin;
+        }
+
+        // Check if saved lastAdSegment appears in current playlist
+        const foundIndex = originUris.findIndex(o => o.uri === this.lastAdSegment);
+
+        if (foundIndex === -1) {
+            // saved segment no longer exists -> clear saved and return original (no injection)
+            this.lastAdSegment = '';
+            return originalText;
+        }
+
+        // Determine insertion position: after the URI line of the saved segment
+        const target = originUris[foundIndex];
+        let insertPos = target.uriLineIdx + 1; // insert after the URI line
+
+        // Safety: if ads are already present immediately after insertPos (avoid double-inject)
+        // check a few lines ahead for an ad uri pattern (e.g., '/ads/' or presence of EXT-X-DISCONTINUITY then ads)
+        const alreadyHasAds = (() => {
+            const lookAhead = 6; // check next up to 6 lines for the first ad uri
+            for (let k = 0; k < lookAhead && (insertPos + k) < lines.length; k++) {
+                const l = lines[insertPos + k].trim();
+                if (l === '#EXT-X-DISCONTINUITY') return true;
+                if (l.startsWith('#EXTINF')) {
+                    // next non-comment line might be uri
+                    let m = insertPos + k + 1;
+                    while (m < lines.length && (lines[m].startsWith('#') || lines[m].trim() === '')) m++;
+                    if (m < lines.length && lines[m].includes('/ads/')) return true;
+                }
+                if (l.includes('/ads/')) return true;
+            }
+            return false;
+        })();
+
+        if (alreadyHasAds) {
+            // Ads already inserted here -> return modified playlist but also ensure lastAdSegment persists
+            return originalText;
+        }
+
+        // Build new lines: pre = up to insertPos-1, post = from insertPos...
+        const pre = lines.slice(0, insertPos);
+        const post = lines.slice(insertPos);
+
+        // Prepare ad block lines
+        const adLines: string[] = [];
+        if (options.addDiscontinuity) adLines.push('#EXT-X-DISCONTINUITY');
+
         for (const seg of adSegments) {
-            injected.splice(insertPos, 0,
-                `#EXTINF:${seg.duration.toFixed(3)},${seg.title || ''}`,
-                seg.uri
-            );
-            insertPos += 2;
-        }
-        //const injected = [...pre];
-        if (options.addDiscontinuity) {
-            injected.splice(insertPos, 0, '#EXT-X-DISCONTINUITY');
-            insertPos++;
+            // Ensure duration is in seconds (EXTINF expects seconds). If seg.duration looks very large assume ms.
+            let durSeconds = seg.duration;
+            if (durSeconds > 10000) durSeconds = durSeconds / 1000; // heuristic: if >10s as int maybe ms
+            adLines.push(`#EXTINF:${durSeconds.toFixed(3)},${seg.title || ''}`);
+            adLines.push(seg.uri);
         }
 
-        injected.push(...pos);
-        return injected.join('\n');
-    }
+        if (options.addDiscontinuity) adLines.push('#EXT-X-DISCONTINUITY');
+
+        // New playlist: pre + adLines + post
+        const resultLines = [...pre, ...adLines, ...post];
+
+        return resultLines.join('\n');
+    };
+
     /**
  * Convert ad manifest (VOD) into an array of segments with absolute URIs.
  * Takes adManifestUrl (absolute) and raw text of ad manifest.
@@ -192,12 +267,12 @@ export default class Channels {
         // }
         if (/EXT-X-STREAM-INF/.test(originText)) {
             // Reemplazar solo en URLs, no en todo el archivo
-            
+
 
             // Primero reemplazamos /fre/ por /frx/ en paths relativos
             let patched = this.patchHlsPaths(originText);
             console.log('Master playlist detected, proxying without ad insertion');
-            console.log(originText, ' => Patched master playlist to :',patched);
+            console.log(originText, ' => Patched master playlist to :', patched);
             res.set('Content-Type', 'application/vnd.apple.mpegurl');
             return res.send(patched);
         } else {
@@ -263,7 +338,7 @@ export default class Channels {
                 total += s.duration;
             }
             let startTime = Date.now();
-            console.log(`Start Time:`, startTime,' total:',total*1000);
+            console.log(`Start Time:`, startTime, ' total:', total * 1000);
             let injectedText = '';
             if (this.isWithinEvenMinuteInterval(startTime, total * 1000)) {
                 // 2. Inject limited ads at the beginning of the playlist
@@ -303,27 +378,27 @@ export default class Channels {
 
     }
 
-// Función para obtener el inicio del minuto par más cercano
-private static getEvenMinuteStartTime = (timestamp:any): number => {
-    const date = new Date(timestamp);
-    const minutes = date.getMinutes();
-    const evenMinute = minutes % 2 === 0 ? minutes : minutes - 1;
-    date.setMinutes(evenMinute, 0, 0); // Establece segundos y milisegundos a 0
-    return date.getTime();
-}
+    // Función para obtener el inicio del minuto par más cercano
+    private static getEvenMinuteStartTime = (timestamp: any): number => {
+        const date = new Date(timestamp);
+        const minutes = date.getMinutes();
+        const evenMinute = minutes % 2 === 0 ? minutes : minutes - 1;
+        date.setMinutes(evenMinute, 0, 0); // Establece segundos y milisegundos a 0
+        return date.getTime();
+    }
 
-// Función para verificar si el tiempo está dentro del intervalo de ±5 segundos del minuto par
-private static isWithinEvenMinuteInterval = (timestamp: any, endInterval:number=300000) => {
-    const evenMinuteStart = this.getEvenMinuteStartTime(timestamp);
-    const lowerBound = evenMinuteStart ; // 2.5 segundos antes
-    const upperBound = evenMinuteStart + endInterval; // 2.5 segundos después
+    // Función para verificar si el tiempo está dentro del intervalo de ±5 segundos del minuto par
+    private static isWithinEvenMinuteInterval = (timestamp: any, endInterval: number = 300000) => {
+        const evenMinuteStart = this.getEvenMinuteStartTime(timestamp);
+        const lowerBound = evenMinuteStart; // 2.5 segundos antes
+        const upperBound = evenMinuteStart + endInterval; // 2.5 segundos después
 
-    console.log(`Actual Time: ${new Date(timestamp).toISOString()}`);
-    console.log(`Even minute: ${new Date(evenMinuteStart).toISOString()}`);
-    console.log(`Lower bound: ${new Date(lowerBound).toISOString()}`);
-    console.log(`Upper bound: ${new Date(upperBound).toISOString()}`);
-    return timestamp >= lowerBound && timestamp <= upperBound;
-}
+        console.log(`Actual Time: ${new Date(timestamp).toISOString()}`);
+        console.log(`Even minute: ${new Date(evenMinuteStart).toISOString()}`);
+        console.log(`Lower bound: ${new Date(lowerBound).toISOString()}`);
+        console.log(`Upper bound: ${new Date(upperBound).toISOString()}`);
+        return timestamp >= lowerBound && timestamp <= upperBound;
+    }
 
     private static patchHlsPaths = (text: string) => {
         // 1️⃣ Reemplaza /fre/ por /frx/ solo en URLs que terminan en .hls
