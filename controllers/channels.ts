@@ -225,7 +225,7 @@ export default class Channels {
                 total += s.duration;
             }
             let startTime = Date.now();
-            console.log(`Start Time:`, startTime,' total:',total);
+            console.log(`Start Time:`, startTime,' total:',total*1000);
             let injectedText = '';
             if (this.isWithinEvenMinuteInterval(startTime, total)) {
                 // 2. Inject limited ads at the beginning of the playlist

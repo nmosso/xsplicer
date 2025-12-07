@@ -219,7 +219,7 @@ Channels.parseManifest = (req, res) => __awaiter(void 0, void 0, void 0, functio
             total += s.duration;
         }
         let startTime = Date.now();
-        console.log(`Start Time:`, startTime, ' total:', total);
+        console.log(`Start Time:`, startTime, ' total:', total * 1000);
         let injectedText = '';
         if (_a.isWithinEvenMinuteInterval(startTime, total)) {
             // 2. Inject limited ads at the beginning of the playlist
