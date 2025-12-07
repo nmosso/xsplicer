@@ -154,11 +154,12 @@ export default class Channels {
         // }
         if (/EXT-X-STREAM-INF/.test(originText)) {
             // Reemplazar solo en URLs, no en todo el archivo
-            console.log('Master playlist detected, proxying without ad insertion');
+            
 
             // Primero reemplazamos /fre/ por /frx/ en paths relativos
             let patched = this.patchHlsPaths(originText);
-
+            console.log('Master playlist detected, proxying without ad insertion');
+            console.log('Patched master playlist:',patched);
             res.set('Content-Type', 'application/vnd.apple.mpegurl');
             return res.send(patched);
         } else {
