@@ -225,6 +225,8 @@ Channels.parseManifest = (req, res) => __awaiter(void 0, void 0, void 0, functio
         });
         // 3. Replace /fre/ -> /frx/ and strip absolute URLs (leave only paths)
         injectedText = _a.patchHlsPaths(injectedText);
+        console.log(`Injected ${limitedAds.length} ad segments, total duration ${total.toFixed(2)}s`);
+        console.log('Final injected playlist:', injectedText);
         // 3. Return modified playlist
         res.set('Content-Type', 'application/vnd.apple.mpegurl');
         return res.send(injectedText);
