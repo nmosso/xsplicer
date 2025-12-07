@@ -1,6 +1,6 @@
 
 import { Router, Request, Response } from 'express'; //Request, 
-const fetch = require('node-fetch');
+//const fetch = require('node-fetch');
 const { Parser, Playlist } = require('m3u8-parser');
 
 /**
@@ -34,7 +34,7 @@ export default class Channels {
      * Fetch raw text with simple error handling
      */
     private static fetchText = async (url: string) => {
-        const res = await fetch(url, { timeout: 15000 });
+        const res = await fetch(url); //, { timeout: 15000 }
         if (!res.ok) {
             const txt = await res.text().catch(() => '');
             const err = new Error(`Fetch failed ${url}: ${res.status} ${res.statusText}`);

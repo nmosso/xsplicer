@@ -10,7 +10,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 var _a;
 Object.defineProperty(exports, "__esModule", { value: true });
-const fetch = require('node-fetch');
+//const fetch = require('node-fetch');
 const { Parser, Playlist } = require('m3u8-parser');
 /**
 * Configuración: ajustar según tu entorno
@@ -42,7 +42,7 @@ Channels.originUrlFromRequestPath = (reqPath) => {
  * Fetch raw text with simple error handling
  */
 Channels.fetchText = (url) => __awaiter(void 0, void 0, void 0, function* () {
-    const res = yield fetch(url, { timeout: 15000 });
+    const res = yield fetch(url); //, { timeout: 15000 }
     if (!res.ok) {
         const txt = yield res.text().catch(() => '');
         const err = new Error(`Fetch failed ${url}: ${res.status} ${res.statusText}`);
