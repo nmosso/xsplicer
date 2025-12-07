@@ -122,7 +122,8 @@ export default class Channels {
      * - Else if lastAdSegment found in current playlist -> inject ads after that segment.
      * - Else -> lastAdSegment disappeared -> clear it and return original playlist unchanged.
      */
-    private static injectAdsBeforeRawPlaylist = (originalText: string, adSegments: Array<{ uri: string, duration: number, title?: string }>, options: { originPrefix?: string, addDiscontinuity?: boolean } = {}) => {
+    private static injectAdsBeforeRawPlaylist = (originalText: string, adSegments: Array<{ uri: string, duration: number, title?: string }>, 
+        options: { originPrefix?: string, addDiscontinuity?: boolean, position?: 'start' | 'end'} = {}) => {
         const originPrefix = options.originPrefix || '/fre/';
         const lines = originalText.split(/\r?\n/);
 
