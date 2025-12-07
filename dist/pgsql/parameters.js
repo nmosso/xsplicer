@@ -62,7 +62,7 @@ class Params {
                 return err;
             });
         };
-        //debug.info(`Params constructor`);
+        debug_1.default.info(`Params constructor`);
         this.getcrossurls();
         //this.getpaths();
         this.getParameters();

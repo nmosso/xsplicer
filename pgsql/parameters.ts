@@ -21,7 +21,7 @@ export default class Params {
 
 
     constructor() {
-        //debug.info(`Params constructor`);
+        debug.info(`Params constructor`);
         this.getcrossurls();
         //this.getpaths();
         this.getParameters();
