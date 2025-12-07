@@ -205,16 +205,30 @@ private static parseManifest = async (req: Request, res: Response) => {
                 return res.send(injectedText);
             }
         } else {
-            // append mode: limit by ad duration
+            // ---- APPEND MODE: inject ads at the beginning of the playlist ----
             console.log('Appending ads to playlist');
+
+            // 1. Limit ad list by max duration
             let total = 0;
             const limitedAds = [];
+
             for (const s of chosenAds) {
                 if ((total + s.duration) > CONFIG.maxAdDurationSeconds) break;
                 limitedAds.push(s);
                 total += s.duration;
             }
-            const injectedText = this.injectAdsIntoRawPlaylist(originText, limitedAds, { addDiscontinuity: CONFIG.addDiscontinuity });
+
+            // 2. Inject limited ads at the beginning of the playlist
+            const injectedText = this.injectAdsIntoRawPlaylist(
+                originText,
+                limitedAds,
+                {
+                    addDiscontinuity: CONFIG.addDiscontinuity,
+                    position: 'start'  // opcional si tu función lo soporta
+                }
+            );
+
+            // 3. Return modified playlist
             res.set('Content-Type', 'application/vnd.apple.mpegurl');
             return res.send(injectedText);
         }

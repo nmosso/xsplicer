@@ -201,8 +201,9 @@ Channels.parseManifest = (req, res) => __awaiter(void 0, void 0, void 0, functio
         }
     }
     else {
-        // append mode: limit by ad duration
+        // ---- APPEND MODE: inject ads at the beginning of the playlist ----
         console.log('Appending ads to playlist');
+        // 1. Limit ad list by max duration
         let total = 0;
         const limitedAds = [];
         for (const s of chosenAds) {
@@ -211,7 +212,12 @@ Channels.parseManifest = (req, res) => __awaiter(void 0, void 0, void 0, functio
             limitedAds.push(s);
             total += s.duration;
         }
-        const injectedText = _a.injectAdsIntoRawPlaylist(originText, limitedAds, { addDiscontinuity: CONFIG.addDiscontinuity });
+        // 2. Inject limited ads at the beginning of the playlist
+        const injectedText = _a.injectAdsIntoRawPlaylist(originText, limitedAds, {
+            addDiscontinuity: CONFIG.addDiscontinuity,
+            position: 'start' // opcional si tu función lo soporta
+        });
+        // 3. Return modified playlist
         res.set('Content-Type', 'application/vnd.apple.mpegurl');
         return res.send(injectedText);
     }
