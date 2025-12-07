@@ -75,6 +75,7 @@ Channels.injectAdsIntoRawPlaylist = (originalText, adSegments, options = {}) => 
     for (let i = 0; i < lines.length; i++) {
         if (lines[i].startsWith('#EXTINF')) {
             lines.splice(i, 0, newLine);
+            break;
         }
     }
     // find last line index containing "#EXTINF"
