@@ -154,7 +154,7 @@ Channels.parseManifest = (req, res) => __awaiter(void 0, void 0, void 0, functio
         // Primero reemplazamos /fre/ por /frx/ en paths relativos
         let patched = _a.patchHlsPaths(originText);
         console.log('Master playlist detected, proxying without ad insertion');
-        console.log('Patched master playlist:', patched);
+        console.log(originText, ' => Patched master playlist to :', patched);
         res.set('Content-Type', 'application/vnd.apple.mpegurl');
         return res.send(patched);
     }
