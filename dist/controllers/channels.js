@@ -32,6 +32,7 @@ const CONFIG = {
 class Channels {
 }
 _a = Channels;
+Channels.runAd = false;
 Channels.originUrlFromRequestPath = (reqPath) => {
     // remap /frx/...  -> CONFIG.originBase/...
     if (!reqPath.startsWith('/frx/'))
@@ -221,14 +222,16 @@ Channels.parseManifest = (req, res) => __awaiter(void 0, void 0, void 0, functio
         let startTime = Date.now();
         console.log(`Start Time:`, startTime, ' total:', total * 1000);
         let injectedText = '';
-        if (_a.isWithinEvenMinuteInterval(startTime, total * 1000)) {
+        if (_a.isWithinEvenMinuteInterval(startTime, 0) && _a.runAd == true) {
             // 2. Inject limited ads at the beginning of the playlist
+            _a.runAd = false;
             injectedText = _a.injectAdsIntoRawPlaylist(originText, limitedAds, {
                 addDiscontinuity: CONFIG.addDiscontinuity,
                 position: 'start' // opcional si tu función lo soporta
             });
         }
         else {
+            _a.runAd = true;
             injectedText = _a.stripAbsoluteUrlsToPaths(originText);
             console.log('Not within even minute interval, skipping ad injection');
         }
