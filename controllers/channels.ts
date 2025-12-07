@@ -147,15 +147,27 @@ private static parseManifest = async (req: Request, res: Response) => {
         const originText = await this.fetchText(fullOriginUrl);
 
         // Quick check: if origin is master playlist (contains EXT-X-STREAM-INF), proxy raw
+        // if (/EXT-X-STREAM-INF/.test(originText)) {
+        //     // Master playlist -> don't inject ads here (we inject into media playlists)
+        //     res.set('Content-Type', 'application/vnd.apple.mpegurl');
+        //     return res.send(originText);
+        // }
         if (/EXT-X-STREAM-INF/.test(originText)) {
-            // Master playlist -> don't inject ads here (we inject into media playlists)
+            // Reemplazar solo en URLs, no en todo el archivo
+            console.log('Master playlist detected, proxying without ad insertion');
+
+            const patched = originText.replace(/\/fre\//g, '/frx/');
+
             res.set('Content-Type', 'application/vnd.apple.mpegurl');
-            return res.send(originText);
+            return res.send(patched);
+        } else {
+            console.log('Media playlist detected, proceeding with ad insertion');
         }
 
         // origin is a media playlist. We'll fetch ad manifest, parse and inject.
         const adText = await this.fetchText(CONFIG.adManifestUrl);
         const adSegments = this.extractAdSegments(CONFIG.adManifestUrl, adText);
+        console.log(`Extracted ${adSegments.length} ad segments from ad manifest`);
 
         if (!adSegments || adSegments.length === 0) {
             // no ads found, just proxy origin
