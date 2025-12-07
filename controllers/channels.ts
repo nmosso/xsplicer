@@ -62,37 +62,6 @@ export default class Channels {
      *
      * adSegments: array of {uri, duration, title?}
      */
-    private static injectAdsIntoRawPlaylist = (originalText: string, adSegments: any, options: any = {}) => {
-        const lines = originalText.split(/\r?\n/);
-        // localizar punto de inserción (ej. al inicio o after last extinf)
-        let insertPos = this.findInsertPos(lines, options.position);
-
-        const injected = [...lines];
-
-        // Insertar discontinuidad antes del bloque de ads
-        injected.splice(insertPos, 0, '#EXT-X-DISCONTINUITY');
-        insertPos++;
-
-        // Insertar ads
-        for (const seg of adSegments) {
-            // opcional: si tenés seg.stime -> insertar PROGRAM-DATE-TIME
-            if (seg.programDateTime) {
-                injected.splice(insertPos, 0, `#EXT-X-PROGRAM-DATE-TIME:${seg.programDateTime}`);
-                insertPos++;
-            }
-            injected.splice(insertPos, 0,
-                `#EXTINF:${(seg.duration / 1000).toFixed(3)},`,
-                seg.uri
-            );
-            insertPos += 2;
-        }
-
-        // Insertar otra discontinuidad para separar retorno al origen
-        injected.splice(insertPos, 0, '#EXT-X-DISCONTINUITY');
-        insertPos++;
-
-        return injected.join('\n');
-    }
 
     /**
      * Decide insertion position in a parsed m3u8 as array of lines.
@@ -168,6 +137,113 @@ export default class Channels {
         return endlistIdx !== -1 ? endlistIdx : lines.length;
     }
 
+    private static findInsertPosForOrigin = (lines: string[], originPrefix?: string, position: 'start' | 'afterLastExtinf' | 'end' | 'beforeSequence' = 'afterLastExtinf'): number => {
+        // Si nos piden buscar por originPrefix, intentamos ubicar el último EXTINF cuya URI incluya originPrefix
+        const findLastIndex = (token: string) => {
+            for (let i = lines.length - 1; i >= 0; i--) {
+                if (lines[i].startsWith(token)) return i;
+            }
+            return -1;
+        };
+
+        // Helper: obtener la URI que sigue a un EXTINF dado (saltar comentarios y líneas vacías)
+        const getUriAfterExtinf = (extinfIdx: number) => {
+            let uriLineIdx = extinfIdx + 1;
+            while (uriLineIdx < lines.length && (lines[uriLineIdx].startsWith('#') || lines[uriLineIdx].trim() === '')) {
+                uriLineIdx++;
+            }
+            return uriLineIdx < lines.length ? { uri: lines[uriLineIdx], uriLineIdx } : null;
+        };
+
+        if (originPrefix) {
+            // Recorremos de atrás hacia adelante buscando un EXTINF cuya URI contenga originPrefix
+            for (let i = lines.length - 1; i >= 0; i--) {
+                if (lines[i].startsWith('#EXTINF')) {
+                    const maybe = getUriAfterExtinf(i);
+                    if (maybe && maybe.uri.includes(originPrefix)) {
+                        // Insertar justo después de la línea URI (i.e., en maybe.uriLineIdx + 1)
+                        return Math.min(maybe.uriLineIdx + 1, lines.length);
+                    }
+                }
+            }
+            // Si no encontramos ninguna EXTINF con originPrefix, caeremos al comportamiento normal
+        }
+
+        // Fallbacks: usar lógica previa según 'position'
+        const endlistIdx = lines.findIndex(l => l.startsWith('#EXT-X-ENDLIST'));
+        if (position === 'end') return endlistIdx !== -1 ? endlistIdx : lines.length;
+
+        if (position === 'start') {
+            const firstExtinf = lines.findIndex(l => l.startsWith('#EXTINF'));
+            if (firstExtinf !== -1) return firstExtinf;
+            const headerIdx = lines.findIndex(l => l.startsWith('#EXTM3U'));
+            return headerIdx !== -1 ? headerIdx + 1 : 0;
+        }
+
+        if (position === 'beforeSequence') {
+            const mediaSeqIdx = lines.findIndex(l => l.startsWith('#EXT-X-MEDIA-SEQUENCE'));
+            const firstExtinf = lines.findIndex(l => l.startsWith('#EXTINF'));
+            if (mediaSeqIdx !== -1 && firstExtinf !== -1) return Math.min(mediaSeqIdx + 1, firstExtinf);
+            if (firstExtinf !== -1) return firstExtinf;
+            const headerIdx = lines.findIndex(l => l.startsWith('#EXTM3U'));
+            return headerIdx !== -1 ? headerIdx + 1 : 0;
+        }
+
+        // afterLastExtinf (default)
+        const lastExtinfIdx = findLastIndex('#EXTINF');
+        if (lastExtinfIdx !== -1) {
+            const maybe = getUriAfterExtinf(lastExtinfIdx);
+            if (maybe) return Math.min(maybe.uriLineIdx + 1, lines.length);
+        }
+
+        return endlistIdx !== -1 ? endlistIdx : lines.length;
+    };
+
+    private static injectAdsIntoRawPlaylist = (originalText: string, adSegments: Array<{ uri: string, duration: number, programDateTime?: string }>, options: any = {}) => {
+        const lines = originalText.split(/\r?\n/);
+
+        // Si se pasó originPrefix (ej: '/fre/' o '/frx/'), use findInsertPosForOrigin para asegurarnos de insertar
+        // después del último segmento del origen. Si no, use la findInsertPos genérica.
+        let insertPos;
+        if (options.originPrefix) {
+            insertPos = this.findInsertPosForOrigin(lines, options.originPrefix, options.position);
+        } else {
+            insertPos = this.findInsertPos(lines, options.position); // usa tu función existente
+        }
+
+        const injected = [...lines];
+
+        // Insertar discontinuidad antes del bloque de ads (si no hay una discontinuidad inmediatamente antes)
+        // Comprobamos la línea anterior para no duplicar discontinuidades
+        const prevLineIdx = Math.max(0, insertPos - 1);
+        if (!injected[prevLineIdx] || !injected[prevLineIdx].startsWith('#EXT-X-DISCONTINUITY')) {
+            injected.splice(insertPos, 0, '#EXT-X-DISCONTINUITY');
+            insertPos++;
+        }
+
+        // Insertar ads
+        for (const seg of adSegments) {
+            if (seg.programDateTime) {
+                injected.splice(insertPos, 0, `#EXT-X-PROGRAM-DATE-TIME:${seg.programDateTime}`);
+                insertPos++;
+            }
+            // duration aquí debe estar en MILISEGUNDOS? en tu código original parece ms; EXTINF espera segundos
+            const durSeconds = (seg.duration && seg.duration > 10000) ? (seg.duration / 1000) : seg.duration; // ajuste heurístico si guardas ms
+            injected.splice(insertPos, 0,
+                `#EXTINF:${(durSeconds).toFixed(3)},`,
+                seg.uri
+            );
+            insertPos += 2;
+        }
+
+        // Insertar otra discontinuidad para separar retorno al origen (si no está ya)
+        if (!injected[insertPos] || !injected[insertPos].startsWith('#EXT-X-DISCONTINUITY')) {
+            injected.splice(insertPos, 0, '#EXT-X-DISCONTINUITY');
+            insertPos++;
+        }
+
+        return injected.join('\n');
+    };
 
     // private static injectAdsIntoRawPlaylist = (originalText: string, adSegments: any, options: any = {}) => {
     //     const lines = originalText.split(/\r?\n/);
