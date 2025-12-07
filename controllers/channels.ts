@@ -238,7 +238,7 @@ export default class Channels {
                     }
                 );
             } else {
-                injectedText = originText;
+            
                 console.log('Not within even minute interval, skipping ad injection');
             }
             // 3. Replace /fre/ -> /frx/ and strip absolute URLs (leave only paths)
@@ -271,13 +271,18 @@ private static isWithinEvenMinuteInterval = (timestamp: any, endInterval:number=
     return timestamp >= lowerBound && timestamp <= upperBound;
 }
 
-    private static patchHlsPaths = (text: string) => {
-        // 1️⃣ Reemplaza /fre/ por /frx/ solo en URLs que terminan en .hls
-        return text.replace(/(https?:\/\/[^\/\s]+)?\/fre\/([^\s]+\.m3u8)/g, (_match, host, path) => {
-            // Si hay host, lo mantenemos; sino queda solo path
-            const prefix = host ?? '';
-            return this.stripAbsoluteUrlsToPaths(`${prefix}/frx/${path}`);
-        });
+    private static patchHlsPaths(text: string) {
+        // 1️⃣ Reemplaza /fre/ → /frx/ solo en URLs que terminen en .m3u8
+        const replaced = text.replace(
+            /(https?:\/\/[^\/\s]+)?\/fre\/([^\s]+\.m3u8)/g,
+            (_match, host, path) => {
+                const prefix = host ?? '';
+                return `${prefix}/frx/${path}`;
+            }
+        );
+
+        // 2️⃣ Siempre convertir URLs absolutas a paths
+        return this.stripAbsoluteUrlsToPaths(replaced);
     }
     private static stripAbsoluteUrlsToPaths = (manifestText: string) => {
         // Reemplaza cualquier URL absoluta (http(s)://host/...) por su path (/...)
