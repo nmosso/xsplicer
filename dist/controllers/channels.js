@@ -449,7 +449,7 @@ Channels.parseManifest = (req, res) => __awaiter(void 0, void 0, void 0, functio
 Channels.getEvenMinuteStartTime = (timestamp) => {
     const date = new Date(timestamp);
     const minutes = date.getMinutes();
-    const evenMinute = minutes % 2 === 0 ? minutes : minutes - 1;
+    const evenMinute = minutes % 1 === 0 ? minutes : minutes - 1;
     date.setMinutes(evenMinute, 0, 0); // Establece segundos y milisegundos a 0
     return date.getTime();
 };

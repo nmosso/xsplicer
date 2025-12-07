@@ -469,7 +469,7 @@ export default class Channels {
             result.push(lines[c.uriIdx]);
             added++;
         }
-        
+
         // Si N === 1 -> ciclo terminado
         if (N === 1) {
             this.lastAdSegment = '';
@@ -484,7 +484,7 @@ export default class Channels {
     private static getEvenMinuteStartTime = (timestamp: any): number => {
         const date = new Date(timestamp);
         const minutes = date.getMinutes();
-        const evenMinute = minutes % 2 === 0 ? minutes : minutes - 1;
+        const evenMinute = minutes % 1 === 0 ? minutes : minutes - 1;
         date.setMinutes(evenMinute, 0, 0); // Establece segundos y milisegundos a 0
         return date.getTime();
     }
