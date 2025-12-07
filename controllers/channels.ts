@@ -228,7 +228,7 @@ export default class Channels {
             let startTime = Date.now();
             console.log(`Start Time:`, startTime,' total:',total*1000);
             let injectedText = '';
-            if (this.isWithinEvenMinuteInterval(startTime,0) && this.runAd==true) {
+            if (this.isWithinEvenMinuteInterval(startTime, total * 1000)) {
                 // 2. Inject limited ads at the beginning of the playlist
                 this.runAd = false;
                 injectedText = this.injectAdsIntoRawPlaylist(

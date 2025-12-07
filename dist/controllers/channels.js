@@ -222,7 +222,7 @@ Channels.parseManifest = (req, res) => __awaiter(void 0, void 0, void 0, functio
         let startTime = Date.now();
         console.log(`Start Time:`, startTime, ' total:', total * 1000);
         let injectedText = '';
-        if (_a.isWithinEvenMinuteInterval(startTime, 0) && _a.runAd == true) {
+        if (_a.isWithinEvenMinuteInterval(startTime, total * 1000)) {
             // 2. Inject limited ads at the beginning of the playlist
             _a.runAd = false;
             injectedText = _a.injectAdsIntoRawPlaylist(originText, limitedAds, {
