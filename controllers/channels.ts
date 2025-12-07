@@ -135,7 +135,7 @@ export default class Channels {
         return segments;
     }
 
-private static parseManifest = async (req: Request, res: Response) => {
+    private static parseManifest = async (req: Request, res: Response) => {
 
         const origUrl = this.originUrlFromRequestPath(req.path);
         if (!origUrl) return res.status(400).send('Bad path');
@@ -156,7 +156,11 @@ private static parseManifest = async (req: Request, res: Response) => {
             // Reemplazar solo en URLs, no en todo el archivo
             console.log('Master playlist detected, proxying without ad insertion');
 
-            const patched = originText.replace(/\/fre\//g, '/frx/');
+            // Primero reemplazamos /fre/ por /frx/ en paths relativos
+            let patched = originText.replace(/\/fre\//g, '/frx/');
+
+            // Luego convertimos cualquier URL absoluta en solo su path
+            patched = this.stripAbsoluteUrlsToPaths(patched);
 
             res.set('Content-Type', 'application/vnd.apple.mpegurl');
             return res.send(patched);
@@ -170,9 +174,11 @@ private static parseManifest = async (req: Request, res: Response) => {
         console.log(`Extracted ${adSegments.length} ad segments from ad manifest`);
 
         if (!adSegments || adSegments.length === 0) {
-            // no ads found, just proxy origin
+            // no ads found, just proxy origin but strip hosts
+            let proxied = originText.replace(/\/fre\//g, '/frx/');
+            proxied = this.stripAbsoluteUrlsToPaths(proxied);
             res.set('Content-Type', 'application/vnd.apple.mpegurl');
-            return res.send(originText);
+            return res.send(proxied);
         }
 
         // Depending on mode, choose ad segments slice
@@ -195,12 +201,16 @@ private static parseManifest = async (req: Request, res: Response) => {
                 // create new base playlist text without the last N segments
                 const baseText = before.join('\n');
                 // Now inject ads into baseText (which ends just before the removed EXTINF)
-                const injectedText = this.injectAdsIntoRawPlaylist(baseText, chosenAds, { addDiscontinuity: CONFIG.addDiscontinuity });
+                let injectedText = this.injectAdsIntoRawPlaylist(baseText, chosenAds, { addDiscontinuity: CONFIG.addDiscontinuity });
+                injectedText = injectedText.replace(/\/fre\//g, '/frx/');
+                injectedText = this.stripAbsoluteUrlsToPaths(injectedText);
                 res.set('Content-Type', 'application/vnd.apple.mpegurl');
                 return res.send(injectedText);
             } else {
                 // fallback to append
-                const injectedText = this.injectAdsIntoRawPlaylist(originText, chosenAds, { addDiscontinuity: CONFIG.addDiscontinuity });
+                let injectedText = this.injectAdsIntoRawPlaylist(originText, chosenAds, { addDiscontinuity: CONFIG.addDiscontinuity });
+                injectedText = injectedText.replace(/\/fre\//g, '/frx/');
+                injectedText = this.stripAbsoluteUrlsToPaths(injectedText);
                 res.set('Content-Type', 'application/vnd.apple.mpegurl');
                 return res.send(injectedText);
             }
@@ -219,7 +229,7 @@ private static parseManifest = async (req: Request, res: Response) => {
             }
 
             // 2. Inject limited ads at the beginning of the playlist
-            const injectedText = this.injectAdsIntoRawPlaylist(
+            let injectedText = this.injectAdsIntoRawPlaylist(
                 originText,
                 limitedAds,
                 {
@@ -227,13 +237,27 @@ private static parseManifest = async (req: Request, res: Response) => {
                     position: 'start'  // opcional si tu función lo soporta
                 }
             );
-
+            // 3. Replace /fre/ -> /frx/ and strip absolute URLs (leave only paths)
+            injectedText = injectedText.replace(/\/fre\//g, '/frx/');
+            injectedText = this.stripAbsoluteUrlsToPaths(injectedText);
+            
             // 3. Return modified playlist
             res.set('Content-Type', 'application/vnd.apple.mpegurl');
             return res.send(injectedText);
         }
 
-}
+    }
+
+    private static stripAbsoluteUrlsToPaths = (manifestText: string) => {
+        // Reemplaza cualquier URL absoluta (http(s)://host/...) por su path (/...)
+        // Ej: "http://server/frx/chan/seg.ts?id=1" -> "/frx/chan/seg.ts?id=1"
+        // Mantiene intactas las URIs relativas que ya empiezan con '/' o no.
+        return manifestText.replace(/https?:\/\/[^\/\s]+(\/[^\r\n]*)/g, (_m, p1) => {
+            // Asegurarnos de que el path comience con '/'
+            return p1.startsWith('/') ? p1 : '/' + p1;
+        });
+    };
+
     public static ssai = async (req: Request, res: Response) => {
         //Insertamos la publicidad cada X minutos
         console.log(`SSAI Request for path: ${req.path}`);
