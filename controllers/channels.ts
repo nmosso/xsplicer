@@ -27,6 +27,7 @@ export default class Channels {
     private static runAd = false;
     // State (dentro de la misma clase)
     private static lastAdSegment: string = '';
+    private static lastActiveAdSegment: string = '';
     private static adCycleCounter: number = 0;
     private static lastSegmentIndex: number = -1;
 
@@ -95,6 +96,7 @@ export default class Channels {
                 insertPos = lines.length;
             }
         }
+        this.lastActiveAdSegment = lines[insertPos - 1] || '';
 
         const injected = [...lines];
         if (options.addDiscontinuity) {
@@ -344,8 +346,8 @@ export default class Channels {
             let injectedText = '';
             if (this.isWithinEvenMinuteInterval(startTime, total * 1000)) {
                 // 2. Inject limited ads at the beginning of the playlist
-                this.runAd = false;
-                injectedText = this.injectAdsSlidingExact(
+                this.runAd = true;
+                injectedText = this.injectAdsIntoRawPlaylist( //, injectAdsIntoRawPlaylist , injectAdsSlidingExact
                     originText,
                     limitedAds,
                     {
@@ -354,7 +356,7 @@ export default class Channels {
                     }
                 );
             } else {
-                this.runAd = true;
+                this.runAd = false;
                 //injectedText = this.stripAbsoluteUrlsToPaths(originText);
                 injectedText = this.injectAdsIntoRawPlaylist(
                     originText,

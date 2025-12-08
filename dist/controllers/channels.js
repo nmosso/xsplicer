@@ -132,6 +132,7 @@ _a = Channels;
 Channels.runAd = false;
 // State (dentro de la misma clase)
 Channels.lastAdSegment = '';
+Channels.lastActiveAdSegment = '';
 Channels.adCycleCounter = 0;
 Channels.lastSegmentIndex = -1;
 Channels.originUrlFromRequestPath = (reqPath) => {
@@ -199,6 +200,7 @@ Channels.injectAdsIntoRawPlaylist = (originalText, adSegments, options = {}) => 
             insertPos = lines.length;
         }
     }
+    _a.lastActiveAdSegment = lines[insertPos - 1] || '';
     const injected = [...lines];
     if (options.addDiscontinuity) {
         injected.splice(insertPos, 0, '#EXT-X-DISCONTINUITY');
@@ -426,14 +428,15 @@ Channels.parseManifest = (req, res) => __awaiter(void 0, void 0, void 0, functio
         let injectedText = '';
         if (_a.isWithinEvenMinuteInterval(startTime, total * 1000)) {
             // 2. Inject limited ads at the beginning of the playlist
-            _a.runAd = false;
-            injectedText = _a.injectAdsSlidingExact(originText, limitedAds, {
+            _a.runAd = true;
+            injectedText = _a.injectAdsIntoRawPlaylist(//, injectAdsIntoRawPlaylist , injectAdsSlidingExact
+            originText, limitedAds, {
                 addDiscontinuity: CONFIG.addDiscontinuity,
                 //position: 'start'  // opcional si tu función lo soporta
             });
         }
         else {
-            _a.runAd = true;
+            _a.runAd = false;
             //injectedText = this.stripAbsoluteUrlsToPaths(originText);
             injectedText = _a.injectAdsIntoRawPlaylist(originText, [], {
                 addDiscontinuity: false,
